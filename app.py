@@ -71,40 +71,6 @@ st.markdown("""
     /* spinner 不换行 */
     .stSpinner { white-space: nowrap !important; }
 
-    /* 侧边栏收起后，展开按钮必须可见且可点击 */
-    [data-testid="collapsedControl"],
-    [data-testid="stSidebarCollapsedControl"] {
-        display: flex !important;
-        position: relative !important;
-        z-index: 9999 !important;
-    }
-    /* 防止侧边栏样式干扰折叠/展开动画 */
-    [data-testid="stSidebar"] {
-        transition: width 0.3s ease !important;
-    }
-
-    /* 文件列表样式 */
-    .file-list-item {
-        padding: 6px 10px;
-        background: #f9fafb;
-        border-radius: 6px;
-        margin: 4px 0;
-        font-size: 14px;
-        color: #374151;
-    }
-
-    /* 内容库操作按钮缩小 */
-    .content-actions button {
-        font-size: 13px !important;
-        padding: 4px 12px !important;
-    }
-
-    /* 侧边栏收起后，展开按钮必须可见 */
-    [data-testid="collapsedControl"] {
-        display: flex !important;
-        z-index: 9999 !important;
-    }
-
     /* 文件标签胶囊样式 */
     .file-tag {
         display: inline-block;

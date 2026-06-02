@@ -122,11 +122,29 @@ def tokenize(text: str) -> list[str]:
 # ===================== 数据库操作 =====================
 
 def _load_db() -> dict:
-    """加载本地JSON数据库"""
+    """加载本地JSON数据库，自动迁移补全 source_type 字段"""
+    migrated = False
     if os.path.exists(DB_FILE):
         with open(DB_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {"documents": [], "chunks": []}
+            db = json.load(f)
+    else:
+        return {"documents": [], "chunks": []}
+
+    # 迁移：为历史 chunk 补全 source_type 字段
+    _knowledge_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "knowledge"))
+    _user_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "user_uploads"))
+    for c in db.get("chunks", []):
+        if "source_type" not in c:
+            sf = c.get("source_file", "")
+            full_path_k = os.path.join(_knowledge_dir, sf)
+            if os.path.exists(full_path_k):
+                c["source_type"] = "system"
+            else:
+                c["source_type"] = "user"
+            migrated = True
+    if migrated:
+        _save_db(db)
+    return db
 
 
 def _save_db(db: dict):
@@ -239,14 +257,36 @@ def get_doc_stats() -> dict:
     """获取知识库统计（含来源分类）"""
     db = _load_db()
     all_files = sorted(set(c["source_file"] for c in db["chunks"]))
-    system_files = sorted(set(c["source_file"] for c in db["chunks"] if c.get("source_type") == "system"))
-    user_files = sorted(set(c["source_file"] for c in db["chunks"] if c.get("source_type") == "user"))
+
+    # 兼容历史数据：优先用 source_type 字段，缺失时根据文件路径判断
+    _knowledge_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "knowledge")
+    _knowledge_dir = os.path.normpath(_knowledge_dir)
+    _user_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "user_uploads")
+    _user_dir = os.path.normpath(_user_dir)
+
+    system_files = set()
+    user_files = set()
+    for c in db["chunks"]:
+        sf = c["source_file"]
+        stype = c.get("source_type")
+        if stype == "system":
+            system_files.add(sf)
+        elif stype == "user":
+            user_files.add(sf)
+        else:
+            # 兼容历史数据：根据文件实际路径判断
+            full_path = os.path.join(_knowledge_dir, sf)
+            if os.path.exists(full_path):
+                system_files.add(sf)
+            else:
+                user_files.add(sf)
+
     return {
         "total_chunks": len(db["chunks"]),
         "total_files": len(all_files),
         "files": all_files,
-        "system_files": system_files,
-        "user_files": user_files
+        "system_files": sorted(system_files),
+        "user_files": sorted(user_files)
     }
 
 
