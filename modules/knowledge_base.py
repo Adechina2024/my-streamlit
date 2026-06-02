@@ -16,7 +16,7 @@ from pathlib import Path
 from collections import Counter
 
 import jieba
-from config import KNOWLEDGE_DIR
+from config import KNOWLEDGE_DIR, USER_UPLOADS_DIR
 
 # 加载珠宝领域自定义词典
 _DICT_PATH = os.path.join(KNOWLEDGE_DIR, "jieba_dict.txt")
@@ -146,9 +146,16 @@ def _save_db(db: dict):
         raise
 
 
-def add_document(filepath: str) -> dict:
+def add_document(filepath: str, source: str = "user") -> dict:
     """
     添加文档到知识库
+
+    Args:
+        filepath: 文件路径
+        source: 来源标识 "system"（预置知识库）或 "user"（用户上传）
+
+    Returns:
+        dict: {file, chunks, status, source}
     """
     db = _load_db()
     filename = os.path.basename(filepath)
@@ -163,12 +170,12 @@ def add_document(filepath: str) -> dict:
         elif ext == ".pdf":
             text = parse_pdf(filepath)
         else:
-            return {"file": filename, "chunks": 0, "status": f"不支持的格式: {ext}"}
+            return {"file": filename, "chunks": 0, "status": f"不支持的格式: {ext}", "source": source}
     except Exception as e:
-        return {"file": filename, "chunks": 0, "status": f"解析失败: {e}"}
+        return {"file": filename, "chunks": 0, "status": f"解析失败: {e}", "source": source}
 
     if not text.strip():
-        return {"file": filename, "chunks": 0, "status": "文件内容为空"}
+        return {"file": filename, "chunks": 0, "status": "文件内容为空", "source": source}
 
     # 删除旧版本
     db["chunks"] = [c for c in db["chunks"] if c["source_file"] != filename]
@@ -183,6 +190,7 @@ def add_document(filepath: str) -> dict:
         chunk_data.append({
             "id": f"{filename}_chunk_{i}",
             "source_file": filename,
+            "source_type": source,
             "chunk_index": i,
             "section": section,
             "text": chunk_text,
@@ -193,35 +201,52 @@ def add_document(filepath: str) -> dict:
     db["documents"].append({
         "filename": filename,
         "filepath": filepath,
+        "source": source,
         "chunks_count": len(chunks)
     })
     db["chunks"].extend(chunk_data)
     _save_db(db)
     invalidate_index_cache()
 
-    return {"file": filename, "chunks": len(chunks), "status": "success"}
+    return {"file": filename, "chunks": len(chunks), "status": "success", "source": source}
 
 
 def delete_document(filename: str) -> dict:
-    """删除文档"""
+    """删除文档（含索引和物理文件）"""
     db = _load_db()
+
+    # 找到文档记录，确认来源
+    doc_record = next((d for d in db["documents"] if d["filename"] == filename), None)
+    source = doc_record.get("source", "user") if doc_record else "user"
+
     before = len(db["chunks"])
     db["chunks"] = [c for c in db["chunks"] if c["source_file"] != filename]
     db["documents"] = [d for d in db["documents"] if d["filename"] != filename]
     deleted = before - len(db["chunks"])
     _save_db(db)
     invalidate_index_cache()
-    return {"file": filename, "deleted": deleted, "status": "success" if deleted > 0 else "未找到该文档"}
+
+    # 删除用户上传的物理文件
+    if source == "user" and doc_record:
+        filepath = doc_record.get("filepath", "")
+        if filepath and os.path.exists(filepath):
+            os.remove(filepath)
+
+    return {"file": filename, "deleted": deleted, "status": "success" if deleted > 0 else "未找到该文档", "source": source}
 
 
 def get_doc_stats() -> dict:
-    """获取知识库统计"""
+    """获取知识库统计（含来源分类）"""
     db = _load_db()
-    files = sorted(set(c["source_file"] for c in db["chunks"]))
+    all_files = sorted(set(c["source_file"] for c in db["chunks"]))
+    system_files = sorted(set(c["source_file"] for c in db["chunks"] if c.get("source_type") == "system"))
+    user_files = sorted(set(c["source_file"] for c in db["chunks"] if c.get("source_type") == "user"))
     return {
         "total_chunks": len(db["chunks"]),
-        "total_files": len(files),
-        "files": files
+        "total_files": len(all_files),
+        "files": all_files,
+        "system_files": system_files,
+        "user_files": user_files
     }
 
 

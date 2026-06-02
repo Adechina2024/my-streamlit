@@ -10,10 +10,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import streamlit as st
 from modules import knowledge_base, retriever, llm_client
+from modules.git_utils import git_auto_commit, has_git_config
 
 # 项目根目录（与 modules 保持一致）
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 _KNOWLEDGE_DIR = os.path.join(_PROJECT_ROOT, "knowledge")
+_USER_UPLOADS_DIR = os.path.join(_PROJECT_ROOT, "user_uploads")
+os.makedirs(_USER_UPLOADS_DIR, exist_ok=True)
 
 # ===================== 页面配置 =====================
 st.set_page_config(
@@ -153,10 +156,21 @@ with st.sidebar:
     st.metric("文档数量", stats["total_files"])
     st.metric("知识段落", stats["total_chunks"])
 
-    if stats["files"]:
-        st.markdown("**已上传文档：**")
-        for f in stats["files"]:
-            st.markdown(f"- `{f}`")
+    if stats.get("system_files"):
+        with st.expander("预置知识库"):
+            for f in stats["system_files"]:
+                st.markdown(f"- `{f}`")
+    if stats.get("user_files"):
+        with st.expander("用户上传"):
+            for f in stats["user_files"]:
+                st.markdown(f"- `{f}`")
+
+    # Git 同步状态
+    st.markdown("---")
+    if has_git_config():
+        st.caption("🔄 数据自动同步到 GitHub")
+    else:
+        st.caption("⚠️ 未配置 GitHub Token，上传数据不会持久化")
 
 # ===================== Tab 导航 =====================
 tab1, tab2, tab3, tab4 = st.tabs(["📚 知识库管理", "💬 智能问答", "✍️ 内容生成", "📂 内容库"])
@@ -177,13 +191,19 @@ with tab1:
         )
         if uploaded_files:
             for file in uploaded_files:
-                save_path = os.path.join(_KNOWLEDGE_DIR, file.name)
+                # 用户上传文件存到 user_uploads/（与预置知识库分离）
+                save_path = os.path.join(_USER_UPLOADS_DIR, file.name)
                 with open(save_path, "wb") as f:
                     f.write(file.getbuffer())
                 with st.spinner(f"正在处理 {file.name}..."):
-                    result = knowledge_base.add_document(save_path)
+                    result = knowledge_base.add_document(save_path, source="user")
                 if result["status"] == "success":
                     st.success(f"✅ {result['file']}：{result['chunks']} 个段落已入库")
+                    # 异步提交到 GitHub 持久化
+                    git_auto_commit(
+                        files_message={save_path: f"用户上传 {file.name}"},
+                        message=f"auto: 用户上传 {file.name}（{result['chunks']}段落）"
+                    )
                 else:
                     st.error(f"❌ {result['file']}：{result['status']}")
 
@@ -196,6 +216,10 @@ with tab1:
                     result = knowledge_base.delete_document(f)
                     if result["status"] == "success":
                         st.success(f"已删除 {f}（{result['deleted']} 个段落）")
+                        # 删除后同步到 GitHub
+                        git_auto_commit(
+                            message=f"auto: 删除文档 {f}（{result['deleted']}段落）"
+                        )
                         st.rerun()
         else:
             st.info("知识库为空，请先上传文档")
@@ -213,9 +237,13 @@ with tab1:
             fpath = os.path.join(_KNOWLEDGE_DIR, fname)
             if st.button(f"📥 导入 {fname}", key=f"import_{fname}"):
                 with st.spinner(f"正在导入 {fname}..."):
-                    result = knowledge_base.add_document(fpath)
+                    result = knowledge_base.add_document(fpath, source="system")
                 if result["status"] == "success":
                     st.success(f"✅ 导入成功：{result['chunks']} 个段落")
+                    # 系统知识库入库也需提交索引
+                    git_auto_commit(
+                        message=f"auto: 导入预置知识库 {fname}（{result['chunks']}段落）"
+                    )
                     st.rerun()
                 else:
                     st.error(f"❌ 导入失败：{result['status']}")

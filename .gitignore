@@ -12,6 +12,10 @@ exports/
 content_history.json
 knowledge_index.json
 
+# 注意：以下文件需要入库（由 git auto commit 管理），不在此忽略
+# - user_uploads/        用户上传的知识库文件
+# - knowledge_db.json    知识库索引
+
 # Streamlit credentials（含登录凭据，不上传）
 .streamlit/credentials.toml
 
