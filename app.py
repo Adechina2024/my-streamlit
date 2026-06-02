@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import streamlit as st
 from modules import knowledge_base, retriever, llm_client
-from modules.git_utils import git_auto_commit, has_git_config
+from modules.git_utils import git_auto_commit, git_auto_delete, has_git_config
 
 # 项目根目录（与 modules 保持一致）
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -216,10 +216,13 @@ with tab1:
                     result = knowledge_base.delete_document(f)
                     if result["status"] == "success":
                         st.success(f"已删除 {f}（{result['deleted']} 个段落）")
-                        # 删除后同步到 GitHub
-                        git_auto_commit(
-                            message=f"auto: 删除文档 {f}（{result['deleted']}段落）"
-                        )
+                        # 用户文件从 GitHub 删除，系统文件只同步索引
+                        if result.get("source") == "user":
+                            git_auto_delete(f, message=f"auto: 删除用户文件 {f}")
+                        else:
+                            git_auto_commit(
+                                message=f"auto: 删除系统文档 {f}（{result['deleted']}段落）"
+                            )
                         st.rerun()
         else:
             st.info("知识库为空，请先上传文档")
