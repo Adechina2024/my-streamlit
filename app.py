@@ -10,10 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import streamlit as st
 from modules import knowledge_base, retriever, llm_client
-from modules.git_utils import (
-    git_auto_commit, git_auto_delete, has_git_config,
-    validate_token, test_sync_one_file, get_last_sync_result
-)
+from modules.git_utils import git_auto_commit, git_auto_delete, has_git_config
 
 # 项目根目录（与 modules 保持一致）
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -32,13 +29,23 @@ st.set_page_config(
 # ===================== 全局样式 =====================
 st.markdown("""
 <style>
+    /* 全局宽度 */
     .stApp { max-width: 1200px; margin: 0 auto; }
-    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
+
+    /* Tab 字体加大 */
+    .stTabs [data-baseweb="tab-list"] { gap: 12px; }
     .stTabs [data-baseweb="tab"] {
-        border-radius: 6px 6px 0 0;
-        padding: 8px 20px;
-        font-size: 15px;
+        border-radius: 8px 8px 0 0;
+        padding: 10px 24px;
+        font-size: 17px !important;
+        font-weight: 600;
     }
+    .stTabs [aria-selected="true"] {
+        background: #f0edff;
+        border-bottom: 3px solid #7c3aed;
+    }
+
+    /* blockquote 样式 */
     blockquote {
         border-left: 3px solid #8B5CF6;
         padding: 8px 12px;
@@ -46,43 +53,56 @@ st.markdown("""
         border-radius: 0 6px 6px 0;
         margin: 8px 0;
     }
-    /* 一键复制按钮样式 */
-    .copy-btn {
-        display: inline-block;
-        padding: 6px 16px;
-        background: #f0f0f0;
-        border: 1px solid #ddd;
+
+    /* 生成按钮加大高亮 */
+    .stButton button[data-baseweb="button"][kind="primary"] {
+        font-size: 17px !important;
+        padding: 10px 28px !important;
+        border-radius: 8px !important;
+        font-weight: 600;
+    }
+
+    /* 普通按钮稍大 */
+    .stButton button {
+        font-size: 15px !important;
+        padding: 6px 16px !important;
+    }
+
+    /* spinner 不换行 */
+    .stSpinner { white-space: nowrap !important; }
+
+    /* 侧边栏精简 */
+    [data-testid="stSidebar"] {
+        min-width: 240px !important;
+    }
+
+    /* 文件列表样式 */
+    .file-list-item {
+        padding: 6px 10px;
+        background: #f9fafb;
         border-radius: 6px;
-        cursor: pointer;
+        margin: 4px 0;
         font-size: 14px;
-        transition: all 0.2s;
+        color: #374151;
     }
-    .copy-btn:hover {
-        background: #8B5CF6;
-        color: white;
-        border-color: #8B5CF6;
+
+    /* 内容库操作按钮缩小 */
+    .content-actions button {
+        font-size: 13px !important;
+        padding: 4px 12px !important;
     }
+
+    /* 隐藏 Streamlit 右上角菜单里的 clear cache 提示 */
+    [data-testid="stToolbar"] { display: none !important; }
+    button[title="Clear cache"] { display: none !important; }
+    .stActionButton button[title="Clear cache"] { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ===================== 辅助函数 ====================
-def copy_button_html(text: str, label: str = "📋 一键复制") -> str:
-    """生成一键复制按钮的 HTML"""
-    import json
-    encoded = json.dumps(text, ensure_ascii=False)
-    return f"""<div style="margin-top:12px">
-        <button class="copy-btn" onclick="
-            navigator.clipboard.writeText({encoded}).then(()=>{{
-                this.textContent='✅ 已复制';
-                setTimeout(()=>this.textContent='{label}',1500);
-            }})
-        ">{label}</button>
-    </div>"""
-
-
 def show_quality_badge(result: dict):
-    """展示质量评分徽章和违规提示"""
+    """展示质量评分徽章和优化空间"""
     score = result.get("quality_score", -1)
     issues = result.get("quality_issues", [])
     details = result.get("quality_details", {})
@@ -93,23 +113,18 @@ def show_quality_badge(result: dict):
     # 评分等级
     if score >= 90:
         level = "优秀"
-        color = "green"
         icon = "🟢"
     elif score >= 80:
         level = "良好"
-        color = "green"
         icon = "✅"
     elif score >= 70:
         level = "合格"
-        color = "orange"
         icon = "🟡"
     elif score >= 60:
         level = "待改进"
-        color = "orange"
         icon = "⚠️"
     else:
         level = "不合格"
-        color = "red"
         icon = "🔴"
 
     # 评分展示
@@ -118,10 +133,9 @@ def show_quality_badge(result: dict):
         st.metric("质量评分", f"{score}分", label_visibility="visible")
         st.caption(f"{icon} {level}")
 
-    # 违规项 + 详情
     with col_detail:
         if issues:
-            st.warning("**存在的问题：**\n" + "\n".join(f"- {iss}" for iss in issues))
+            st.warning("**优化空间：**\n" + "\n".join(f"- {iss}" for iss in issues))
         else:
             st.success("格式规范，内容质量良好")
 
@@ -146,7 +160,6 @@ def show_quality_badge(result: dict):
             st.caption(" | ".join(detail_parts))
 
 
-
 # ===================== 侧边栏 =====================
 with st.sidebar:
     st.markdown("## 💎 珠宝AI内容工具")
@@ -159,50 +172,18 @@ with st.sidebar:
     st.metric("文档数量", stats["total_files"])
     st.metric("知识段落", stats["total_chunks"])
 
-    if stats.get("system_files"):
-        with st.expander("预置知识库"):
-            for f in stats["system_files"]:
-                st.markdown(f"- `{f}`")
-    if stats.get("user_files"):
-        with st.expander("用户上传"):
-            for f in stats["user_files"]:
+    # 文件列表（只读展示）
+    if stats.get("system_files") or stats.get("user_files"):
+        with st.expander("已入库文档", expanded=True):
+            for f in (stats.get("system_files", []) + stats.get("user_files", [])):
                 st.markdown(f"- `{f}`")
 
-    # Git 同步状态
+    # Git 同步状态（只显示一句话，无按钮无详情）
     st.markdown("---")
-    st.markdown("### 🔄 GitHub 同步")
-
-    if not has_git_config():
-        st.caption("⚠️ 未配置 GitHub Token，上传数据不会持久化")
+    if has_git_config():
+        st.caption("🔄 数据自动同步到 GitHub")
     else:
-        # Token 有效性检测（首次或点击后刷新）
-        if "github_token_valid" not in st.session_state:
-            with st.spinner("检测 Token..."):
-                st.session_state.github_token_valid = validate_token()
-
-        v = st.session_state.github_token_valid
-        if v["ok"]:
-            st.success(v["msg"])
-        else:
-            st.error(v["msg"])
-
-        # 手动测试同步按钮
-        if st.button("🧪 测试同步连接", key="test_sync_btn"):
-            with st.spinner("正在向 GitHub 写入测试文件..."):
-                result = test_sync_one_file()
-            if result["ok"]:
-                st.success(result["msg"])
-                st.session_state.github_token_valid = validate_token()
-            else:
-                st.error(result["msg"])
-
-        # 显示最后一次同步结果
-        last = get_last_sync_result()
-        if last.get("time"):
-            if last["ok"]:
-                st.caption(f"✅ 上次同步 {last['time']}: {last['msg']}")
-            else:
-                st.caption(f"❌ 上次同步 {last['time']}: {last['msg']}")
+        st.caption("⚠️ 未配置 GitHub Token，上传数据不会持久化")
 
 # ===================== Tab 导航 =====================
 tab1, tab2, tab3, tab4 = st.tabs(["📚 知识库管理", "💬 智能问答", "✍️ 内容生成", "📂 内容库"])
@@ -212,57 +193,46 @@ with tab1:
     st.header("知识库管理")
     st.caption("上传水晶相关知识文档，系统自动解析、分块、BM25索引存储")
 
-    col1, col2 = st.columns([1, 1])
+    # 上方：上传区域
+    st.subheader("上传文档")
+    uploaded_files = st.file_uploader(
+        "支持格式：Markdown / TXT / PDF",
+        type=["md", "txt", "pdf"],
+        accept_multiple_files=True
+    )
+    if uploaded_files:
+        for file in uploaded_files:
+            save_path = os.path.join(_USER_UPLOADS_DIR, file.name)
+            with open(save_path, "wb") as f:
+                f.write(file.getbuffer())
+            with st.spinner(f"正在处理 {file.name}..."):
+                result = knowledge_base.add_document(save_path, source="user")
+            if result["status"] == "success":
+                st.success(f"✅ {result['file']}：{result['chunks']} 个段落已入库")
+                git_auto_commit(
+                    files_message={save_path: f"用户上传 {file.name}"},
+                    message=f"auto: 用户上传 {file.name}（{result['chunks']}段落）"
+                )
+            else:
+                st.error(f"❌ {result['file']}：{result['status']}")
 
-    with col1:
-        st.subheader("上传文档")
-        uploaded_files = st.file_uploader(
-            "支持格式：Markdown / TXT / PDF",
-            type=["md", "txt", "pdf"],
-            accept_multiple_files=True
-        )
-        if uploaded_files:
-            for file in uploaded_files:
-                # 用户上传文件存到 user_uploads/（与预置知识库分离）
-                save_path = os.path.join(_USER_UPLOADS_DIR, file.name)
-                with open(save_path, "wb") as f:
-                    f.write(file.getbuffer())
-                with st.spinner(f"正在处理 {file.name}..."):
-                    result = knowledge_base.add_document(save_path, source="user")
-                if result["status"] == "success":
-                    st.success(f"✅ {result['file']}：{result['chunks']} 个段落已入库")
-                    # 异步提交到 GitHub 持久化
-                    git_auto_commit(
-                        files_message={save_path: f"用户上传 {file.name}"},
-                        message=f"auto: 用户上传 {file.name}（{result['chunks']}段落）"
-                    )
-                else:
-                    st.error(f"❌ {result['file']}：{result['status']}")
+    # 分隔线
+    st.markdown("---")
 
-    with col2:
-        st.subheader("删除文档")
-        stats = knowledge_base.get_doc_stats()
-        if stats["files"]:
-            for f in stats["files"]:
-                if st.button(f"🗑️ {f}", key=f"del_{f}"):
-                    result = knowledge_base.delete_document(f)
-                    if result["status"] == "success":
-                        st.success(f"已删除 {f}（{result['deleted']} 个段落）")
-                        # 用户文件从 GitHub 删除，系统文件只同步索引
-                        if result.get("source") == "user":
-                            git_auto_delete(f, message=f"auto: 删除用户文件 {f}")
-                        else:
-                            git_auto_commit(
-                                message=f"auto: 删除系统文档 {f}（{result['deleted']}段落）"
-                            )
-                        st.rerun()
-        else:
-            st.info("知识库为空，请先上传文档")
+    # 下方：已入库文档列表（只读，无删除按钮）
+    st.subheader("已入库文档")
+    stats = knowledge_base.get_doc_stats()
+    if stats["files"]:
+        for f in stats["files"]:
+            tag = "📌 预置" if f in stats.get("system_files", []) else "📤 用户上传"
+            st.markdown(f"- `{f}`  {tag}")
+    else:
+        st.info("知识库为空，请先上传文档")
 
     # 预置知识库快速导入
     _preset_files = [f for f in os.listdir(_KNOWLEDGE_DIR)
                      if f.endswith(('.md', '.txt')) and f != 'jieba_dict.txt']
-    _indexed = set(stats["files"])  # stats 来自上方 get_doc_stats()
+    _indexed = set(stats["files"])
     _unindexed = [f for f in _preset_files if f not in _indexed]
     if _unindexed:
         st.markdown("---")
@@ -275,7 +245,6 @@ with tab1:
                     result = knowledge_base.add_document(fpath, source="system")
                 if result["status"] == "success":
                     st.success(f"✅ 导入成功：{result['chunks']} 个段落")
-                    # 系统知识库入库也需提交索引
                     git_auto_commit(
                         message=f"auto: 导入预置知识库 {fname}（{result['chunks']}段落）"
                     )
@@ -320,7 +289,6 @@ with tab2:
 
     # 输入框
     prompt = st.chat_input("输入你的问题...", key="qa_input")
-    # 快捷问题直接提交（优先处理，因为按钮点击时 prompt 为 None）
     if "qa_quick_submit" in st.session_state and st.session_state.qa_quick_submit:
         prompt = st.session_state.qa_quick_submit
         del st.session_state.qa_quick_submit
@@ -376,7 +344,7 @@ with tab2:
             st.session_state.qa_messages = []
             st.rerun()
 
-# ===================== Tab3: 内容生成 ====================
+# ===================== Tab3: 内容生成 =====================
 with tab3:
     st.header("内容生成")
     st.caption("选择模板，填入关键信息，一键生成营销文案")
@@ -399,7 +367,7 @@ with tab3:
 
         col_gen, col_reg = st.columns([1, 5])
         with col_gen:
-            if st.button("✨ 生成", type="primary", disabled=not crystal, key="xhs_gen"):
+            if st.button("✨ 生成文案", type="primary", disabled=not crystal, key="xhs_gen"):
                 with st.spinner("正在生成小红书文案..."):
                     try:
                         from modules.generator import generate_xiaohongshu
@@ -424,7 +392,6 @@ with tab3:
             st.markdown("### 生成结果")
             show_quality_badge(st.session_state.xhs_result)
             st.markdown(st.session_state.xhs_result["content"])
-            st.markdown(copy_button_html(st.session_state.xhs_result["content"]), unsafe_allow_html=True)
             with st.expander("📝 纯文本"):
                 st.text(st.session_state.xhs_result["content"])
 
@@ -440,7 +407,7 @@ with tab3:
 
         col_gen, col_reg = st.columns([1, 5])
         with col_gen:
-            if st.button("✨ 生成", type="primary", disabled=not crystal, key="pd_gen"):
+            if st.button("✨ 生成描述", type="primary", disabled=not crystal, key="pd_gen"):
                 with st.spinner("正在生成产品描述..."):
                     try:
                         from modules.generator import generate_product_desc
@@ -465,7 +432,6 @@ with tab3:
             st.markdown("### 生成结果")
             show_quality_badge(st.session_state.pd_result)
             st.markdown(st.session_state.pd_result["content"])
-            st.markdown(copy_button_html(st.session_state.pd_result["content"]), unsafe_allow_html=True)
             with st.expander("📝 纯文本"):
                 st.text(st.session_state.pd_result["content"])
 
@@ -501,10 +467,6 @@ with tab3:
                     score_tag = f"（{individual_scores[i]}分）" if i < len(individual_scores) else ""
                     st.markdown(f"**📝 方案 {i+1}**{score_tag}")
                     st.markdown(copy)
-                    st.markdown(
-                        copy_button_html(copy.strip(), f"📋 复制方案{i+1}"),
-                        unsafe_allow_html=True
-                    )
                     if i < len(copies) - 1:
                         st.divider()
 
@@ -530,7 +492,7 @@ with tab3:
 
         col_gen, col_reg = st.columns([1, 5])
         with col_gen:
-            if st.button("✨ 生成", type="primary", disabled=not crystal, key="vid_gen"):
+            if st.button("✨ 生成文案", type="primary", disabled=not crystal, key="vid_gen"):
                 with st.spinner("正在生成视频号文案..."):
                     try:
                         from modules.generator import generate_video_script
@@ -555,7 +517,6 @@ with tab3:
             st.markdown("### 生成结果")
             show_quality_badge(st.session_state.vid_result)
             st.markdown(st.session_state.vid_result["content"])
-            st.markdown(copy_button_html(st.session_state.vid_result["content"]), unsafe_allow_html=True)
             with st.expander("📝 纯文本"):
                 st.text(st.session_state.vid_result["content"])
 
@@ -567,30 +528,30 @@ with tab4:
     from modules.content_store import list_contents, toggle_favorite, delete_content, get_stats, export_txt, export_batch_txt
 
     # 统计概览
-    stats = content_stats = get_stats()
-    if content_stats["total"] == 0:
+    stats = get_stats()
+    if stats["total"] == 0:
         st.info("内容库为空。在「内容生成」中生成文案后会自动保存到这里。")
     else:
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("总内容", content_stats["total"])
-        col2.metric("已收藏", content_stats["favorites"])
-        col3.metric("模板类型", content_stats["template_types"])
-        col4.metric("水晶种类", content_stats["crystal_names"])
+        col1.metric("总内容", stats["total"])
+        col2.metric("已收藏", stats["favorites"])
+        col3.metric("模板类型", stats["template_types"])
+        col4.metric("水晶种类", stats["crystal_names"])
 
     # 筛选栏
-    if content_stats["total"] > 0:
+    if stats["total"] > 0:
         st.markdown("---")
         filter_col1, filter_col2, filter_col3 = st.columns([1, 1, 1])
         with filter_col1:
             filter_template = st.selectbox(
                 "按模板筛选",
-                ["全部"] + content_stats["templates"],
+                ["全部"] + stats["templates"],
                 key="lib_filter_template"
             )
         with filter_col2:
             filter_crystal = st.selectbox(
                 "按水晶筛选",
-                ["全部"] + content_stats["crystals"],
+                ["全部"] + stats["crystals"],
                 key="lib_filter_crystal"
             )
         with filter_col3:
@@ -641,25 +602,20 @@ with tab4:
             fav_icon = "⭐" if is_fav else "☆"
 
             with st.container():
-                # 展开/收起用 expander
                 expander_title = f"{fav_icon} {title_text}  |  {created}  |  {score_tag}"
                 with st.expander(expander_title):
-                    # 操作按钮行
-                    btn_col1, btn_col2, btn_col3, btn_col4 = st.columns([1, 1, 1, 3])
+                    # 操作按钮行（去掉了"复制"按钮）
+                    btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 2])
                     with btn_col1:
                         fav_label = "取消收藏" if is_fav else "收藏"
                         if st.button(fav_label, key=f"fav_{rid}"):
                             toggle_favorite(rid)
                             st.rerun()
                     with btn_col2:
-                        if st.button("复制", key=f"copy_{rid}"):
-                            st.markdown(copy_button_html(record["content"]), unsafe_allow_html=True)
-                            st.toast("已复制到剪贴板")
-                    with btn_col3:
                         if st.button("删除", key=f"del_{rid}"):
                             delete_content(rid)
                             st.rerun()
-                    with btn_col4:
+                    with btn_col3:
                         if st.button("导出TXT", key=f"export_{rid}"):
                             path = export_txt(record["content"], f"{crystal}_{template}.txt")
                             st.success(f"已导出到: {path}")
@@ -671,7 +627,7 @@ with tab4:
                     if score >= 0:
                         issues = record.get("quality_issues", [])
                         if issues:
-                            st.caption(f"质量问题: {'; '.join(issues)}")
+                            st.caption(f"优化空间: {'; '.join(issues)}")
 
         # 底部操作
         if records:
