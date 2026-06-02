@@ -200,22 +200,28 @@ with tab1:
         else:
             st.info("知识库为空，请先上传文档")
 
-    # 快速导入小程序知识库
-    st.markdown("---")
-    st.subheader("快速导入")
-    st.caption("从小程序 Knowledge.md 导入善福阁基础知识")
-    wechat_kb_path = r"D:\Cursor\wechat-first\services\Knowledge.md"
-    if os.path.exists(wechat_kb_path):
-        if st.button("📥 导入善福阁知识库"):
-            with st.spinner("正在导入..."):
-                result = knowledge_base.add_document(wechat_kb_path)
-            if result["status"] == "success":
-                st.success(f"✅ 导入成功：{result['chunks']} 个段落")
-                st.rerun()
-            else:
-                st.error(f"❌ 导入失败：{result['status']}")
-    else:
-        st.warning(f"未找到小程序知识库文件：{wechat_kb_path}")
+    # 预置知识库快速导入
+    _preset_files = [f for f in os.listdir(_KNOWLEDGE_DIR)
+                     if f.endswith(('.md', '.txt')) and f != 'jieba_dict.txt']
+    _indexed = set(stats["files"])  # stats 来自上方 get_doc_stats()
+    _unindexed = [f for f in _preset_files if f not in _indexed]
+    if _unindexed:
+        st.markdown("---")
+        st.subheader("📚 预置知识库")
+        st.caption("以下文件已随项目打包，可一键导入到知识库")
+        for fname in _unindexed:
+            fpath = os.path.join(_KNOWLEDGE_DIR, fname)
+            if st.button(f"📥 导入 {fname}", key=f"import_{fname}"):
+                with st.spinner(f"正在导入 {fname}..."):
+                    result = knowledge_base.add_document(fpath)
+                if result["status"] == "success":
+                    st.success(f"✅ 导入成功：{result['chunks']} 个段落")
+                    st.rerun()
+                else:
+                    st.error(f"❌ 导入失败：{result['status']}")
+    elif _preset_files:
+        st.markdown("---")
+        st.caption(f"📚 预置知识库已全部导入（{len(_preset_files)} 个文件）")
 
 # ===================== Tab2: 智能问答 =====================
 with tab2:
