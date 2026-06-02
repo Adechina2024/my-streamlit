@@ -227,19 +227,17 @@ def git_auto_commit(files_message: dict | None = None, message: str = "") -> Non
 
     def _sync():
         try:
-            if not message:
-                desc = ", ".join(files_message.values()) if files_message else "知识库数据更新"
-                message = f"auto: {desc}"
+            commit_msg = message if message else f"auto: {', '.join(files_message.values()) if files_message else '知识库数据更新'}"
 
             # 上传用户文件
             if files_message:
                 for local_path, desc in files_message.items():
                     filename = os.path.basename(local_path)
                     repo_path = f"user_uploads/{filename}"
-                    _upload_file_to_github(local_path, repo_path, message)
+                    _upload_file_to_github(local_path, repo_path, commit_msg)
 
             # 同步索引
-            _sync_knowledge_db(message)
+            _sync_knowledge_db(commit_msg)
 
         except Exception as e:
             logger.error(f"GitHub sync failed: {e}")
@@ -256,11 +254,10 @@ def git_auto_delete(filename: str, message: str = "") -> None:
 
     def _delete():
         try:
-            if not message:
-                message = f"auto: 删除用户文件 {filename}"
+            commit_msg = message if message else f"auto: 删除用户文件 {filename}"
             repo_path = f"user_uploads/{filename}"
-            _github_delete_file(repo_path, message)
-            _sync_knowledge_db(message)
+            _github_delete_file(repo_path, commit_msg)
+            _sync_knowledge_db(commit_msg)
         except Exception as e:
             logger.error(f"GitHub delete failed: {e}")
             _set_sync_result(False, f"删除异常: {e}")
