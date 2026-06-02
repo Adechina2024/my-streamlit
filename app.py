@@ -92,6 +92,35 @@ st.markdown("""
         padding: 4px 12px !important;
     }
 
+    /* 侧边栏收起后，展开按钮必须可见 */
+    [data-testid="collapsedControl"] {
+        display: flex !important;
+        z-index: 9999 !important;
+    }
+
+    /* 文件标签胶囊样式 */
+    .file-tag {
+        display: inline-block;
+        padding: 4px 12px;
+        margin: 4px 6px 4px 0;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+        background: #f3f4f6;
+        color: #374151;
+        border: 1px solid #e5e7eb;
+    }
+    .file-tag.system {
+        background: #ede9fe;
+        color: #6d28d9;
+        border-color: #c4b5fd;
+    }
+    .file-tag.user {
+        background: #ecfdf5;
+        color: #059669;
+        border-color: #a7f3d0;
+    }
+
     /* 隐藏 Streamlit 右上角菜单里的 clear cache 提示 */
     [data-testid="stToolbar"] { display: none !important; }
     button[title="Clear cache"] { display: none !important; }
@@ -219,13 +248,27 @@ with tab1:
     # 分隔线
     st.markdown("---")
 
-    # 下方：已入库文档列表（只读，无删除按钮）
+    # 下方：已入库文档列表（标签胶囊样式，无删除按钮）
     st.subheader("已入库文档")
     stats = knowledge_base.get_doc_stats()
     if stats["files"]:
+        _system_set = set(stats.get("system_files", []))
+        _user_set = set(stats.get("user_files", []))
+        _capsules = []
         for f in stats["files"]:
-            tag = "📌 预置" if f in stats.get("system_files", []) else "📤 用户上传"
-            st.markdown(f"- `{f}`  {tag}")
+            if f in _system_set:
+                _cls, _label = "system", "📌 预置"
+            elif f in _user_set:
+                _cls, _label = "user", "📤 用户上传"
+            else:
+                _cls, _label = "", "📄 未知"
+            _capsules.append(
+                f'<span class="file-tag {_cls}">`{f}`  {_label}</span>'
+            )
+        st.markdown(
+            '<div style="line-height:2.2">' + " ".join(_capsules) + "</div>",
+            unsafe_allow_html=True
+        )
     else:
         st.info("知识库为空，请先上传文档")
 
