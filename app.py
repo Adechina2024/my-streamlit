@@ -42,7 +42,6 @@ st.markdown("""
     }
     .stTabs [aria-selected="true"] {
         background: #f0edff;
-        border-bottom: 3px solid #7c3aed;
     }
 
     /* blockquote 样式 */
@@ -84,9 +83,9 @@ st.markdown("""
         border: 1px solid #e5e7eb;
     }
     .file-tag.system {
-        background: #ede9fe;
-        color: #6d28d9;
-        border-color: #c4b5fd;
+        background: #f3f4f6;
+        color: #111827;
+        border-color: #d1d5db;
     }
     .file-tag.user {
         background: #ecfdf5;
@@ -174,10 +173,10 @@ with st.sidebar:
     st.metric("文档数量", stats["total_files"])
     st.metric("知识段落", stats["total_chunks"])
 
-    # 文件列表（只读展示）
-    if stats.get("system_files") or stats.get("user_files"):
-        with st.expander("已入库文档", expanded=True):
-            for f in (stats.get("system_files", []) + stats.get("user_files", [])):
+    # 用户上传文件列表（只展示用户上传的）
+    if stats.get("user_files"):
+        with st.expander("用户上传", expanded=True):
+            for f in stats.get("user_files", []):
                 st.markdown(f"- `{f}`")
 
     # Git 同步状态（只显示一句话，无按钮无详情）
