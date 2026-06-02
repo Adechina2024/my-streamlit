@@ -35,12 +35,12 @@ st.markdown("""
     /* 全局宽度 */
     .stApp { max-width: 1200px; margin: 0 auto; }
 
-    /* Tab 字体加大 */
+    /* Tab 字体 */
     .stTabs [data-baseweb="tab-list"] { gap: 12px; }
     .stTabs [data-baseweb="tab"] {
         border-radius: 8px 8px 0 0;
         padding: 10px 24px;
-        font-size: 17px !important;
+        font-size: 1rem !important;
         font-weight: 600;
     }
     .stTabs [aria-selected="true"] {
@@ -72,6 +72,11 @@ st.markdown("""
 
     /* spinner 不换行 */
     .stSpinner { white-space: nowrap !important; }
+
+    /* 侧边栏 h2 标题加大 */
+    [data-testid="stSidebar"] h2 {
+        font-size: 1.5rem !important;
+    }
 
     /* 文件标签胶囊样式 */
     .file-tag {
