@@ -62,8 +62,8 @@ st.markdown("""
         font-weight: 600;
     }
 
-    /* 普通按钮稍大 */
-    .stButton button {
+    /* 普通按钮稍大（仅限主内容区，不碰侧边栏按钮） */
+    section.main .stButton button {
         font-size: 15px !important;
         padding: 6px 16px !important;
     }
@@ -94,10 +94,10 @@ st.markdown("""
         border-color: #a7f3d0;
     }
 
-    /* 隐藏 Streamlit 右上角菜单里的 clear cache 提示 */
-    [data-testid="stToolbar"] { display: none !important; }
-    button[title="Clear cache"] { display: none !important; }
-    .stActionButton button[title="Clear cache"] { display: none !important; }
+    /* 隐藏 Streamlit 右上角菜单里的 clear cache 提示（仅主内容区右上角，不碰侧边栏） */
+    section.main [data-testid="stToolbar"] { display: none !important; }
+    section.main button[title="Clear cache"] { display: none !important; }
+    section.main .stActionButton button[title="Clear cache"] { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
