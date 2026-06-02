@@ -1,0 +1,24 @@
+# Python缓存
+__pycache__/
+*.pyc
+
+# 已废弃的向量数据库
+chroma_db/
+
+# 导出产物
+exports/
+
+# 本地运行时生成的数据（可从知识库重建）
+content_history.json
+knowledge_index.json
+
+# Streamlit credentials（含登录凭据，不上传）
+.streamlit/credentials.toml
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
