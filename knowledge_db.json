@@ -49,7 +49,7 @@
     },
     {
       "filename": "deepseep.txt",
-      "filepath": "/mount/src/my-streamlit/user_uploads/deepseep.txt",
+      "filepath": "D:\\Claude\\jewelry-ai-tool\\user_uploads\\deepseep.txt",
       "source": "user",
       "chunks_count": 11
     }
