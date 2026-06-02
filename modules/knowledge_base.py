@@ -253,6 +253,44 @@ def delete_document(filename: str) -> dict:
     return {"file": filename, "deleted": deleted, "status": "success" if deleted > 0 else "未找到该文档", "source": source}
 
 
+def clean_orphan_docs() -> dict:
+    """
+    启动时自动清理：删除 user_uploads/ 目录中已不存在的文件的 DB 记录。
+    GitHub 是唯一真相源——在 GitHub 上删除文件后，重启/部署即自动同步。
+    """
+    db = _load_db()
+    _user_dir = os.path.normpath(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "user_uploads")
+    )
+
+    # 收集 user_uploads/ 目录中实际存在的文件
+    if os.path.exists(_user_dir):
+        existing_files = set(
+            f for f in os.listdir(_user_dir)
+            if os.path.isfile(os.path.join(_user_dir, f))
+        )
+    else:
+        existing_files = set()
+
+    # 找出 DB 里有记录但本地文件已不存在的 user 文件
+    user_files_in_db = sorted(set(
+        c["source_file"] for c in db["chunks"] if c.get("source_type") == "user"
+    ))
+    orphan_files = [f for f in user_files_in_db if f not in existing_files]
+
+    if not orphan_files:
+        return {"cleaned": [], "count": 0}
+
+    # 执行清理
+    before = len(db["chunks"])
+    db["chunks"] = [c for c in db["chunks"] if c["source_file"] not in orphan_files]
+    db["documents"] = [d for d in db["documents"] if d["filename"] not in orphan_files]
+    deleted = before - len(db["chunks"])
+    _save_db(db)
+    invalidate_index_cache()
+    return {"cleaned": orphan_files, "count": len(orphan_files)}
+
+
 def get_doc_stats() -> dict:
     """获取知识库统计（含来源分类）"""
     db = _load_db()

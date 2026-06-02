@@ -12,6 +12,9 @@ import streamlit as st
 from modules import knowledge_base, retriever, llm_client
 from modules.git_utils import git_auto_commit, git_auto_delete, has_git_config
 
+# 启动时自动清理：把 GitHub 作为唯一真相源
+_clean_result = knowledge_base.clean_orphan_docs()
+
 # 项目根目录（与 modules 保持一致）
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 _KNOWLEDGE_DIR = os.path.join(_PROJECT_ROOT, "knowledge")
