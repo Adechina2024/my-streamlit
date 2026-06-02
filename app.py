@@ -40,11 +40,16 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] {
         border-radius: 8px 8px 0 0;
         padding: 10px 24px;
-        font-size: 1rem !important;
+        font-size: 1.1rem !important;
         font-weight: 600;
     }
     .stTabs [aria-selected="true"] {
         background: #f0edff;
+    }
+
+    /* 主内容区 h2 稍微缩小 */
+    section.main h2 {
+        font-size: 1.35rem !important;
     }
 
     /* blockquote 样式 */
