@@ -71,9 +71,16 @@ st.markdown("""
     /* spinner 不换行 */
     .stSpinner { white-space: nowrap !important; }
 
-    /* 侧边栏精简 */
+    /* 侧边栏收起后，展开按钮必须可见且可点击 */
+    [data-testid="collapsedControl"],
+    [data-testid="stSidebarCollapsedControl"] {
+        display: flex !important;
+        position: relative !important;
+        z-index: 9999 !important;
+    }
+    /* 防止侧边栏样式干扰折叠/展开动画 */
     [data-testid="stSidebar"] {
-        min-width: 240px !important;
+        transition: width 0.3s ease !important;
     }
 
     /* 文件列表样式 */
@@ -261,7 +268,7 @@ with tab1:
             elif f in _user_set:
                 _cls, _label = "user", "📤 用户上传"
             else:
-                _cls, _label = "", "📄 未知"
+                _cls, _label = "system", "📌 预置"
             _capsules.append(
                 f'<span class="file-tag {_cls}">`{f}`  {_label}</span>'
             )
