@@ -10,7 +10,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import streamlit as st
 from modules import knowledge_base, retriever, llm_client
-from modules.git_utils import git_auto_commit, git_auto_delete, has_git_config
+from modules.git_utils import (
+    git_auto_commit, git_auto_delete, has_git_config,
+    validate_token, test_sync_one_file, get_last_sync_result
+)
 
 # 项目根目录（与 modules 保持一致）
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -167,10 +170,39 @@ with st.sidebar:
 
     # Git 同步状态
     st.markdown("---")
-    if has_git_config():
-        st.caption("🔄 数据自动同步到 GitHub")
-    else:
+    st.markdown("### 🔄 GitHub 同步")
+
+    if not has_git_config():
         st.caption("⚠️ 未配置 GitHub Token，上传数据不会持久化")
+    else:
+        # Token 有效性检测（首次或点击后刷新）
+        if "github_token_valid" not in st.session_state:
+            with st.spinner("检测 Token..."):
+                st.session_state.github_token_valid = validate_token()
+
+        v = st.session_state.github_token_valid
+        if v["ok"]:
+            st.success(v["msg"])
+        else:
+            st.error(v["msg"])
+
+        # 手动测试同步按钮
+        if st.button("🧪 测试同步连接", key="test_sync_btn"):
+            with st.spinner("正在向 GitHub 写入测试文件..."):
+                result = test_sync_one_file()
+            if result["ok"]:
+                st.success(result["msg"])
+                st.session_state.github_token_valid = validate_token()
+            else:
+                st.error(result["msg"])
+
+        # 显示最后一次同步结果
+        last = get_last_sync_result()
+        if last.get("time"):
+            if last["ok"]:
+                st.caption(f"✅ 上次同步 {last['time']}: {last['msg']}")
+            else:
+                st.caption(f"❌ 上次同步 {last['time']}: {last['msg']}")
 
 # ===================== Tab 导航 =====================
 tab1, tab2, tab3, tab4 = st.tabs(["📚 知识库管理", "💬 智能问答", "✍️ 内容生成", "📂 内容库"])
