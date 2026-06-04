@@ -1,5 +1,6 @@
 # 配置读取优先级：st.secrets → 环境变量 → 默认值
 # ModelScope 等平台不支持 .streamlit/secrets.toml，必须走环境变量
+import os as _os
 
 # 阿里云百炼 API Key
 _api_key_st = ""
